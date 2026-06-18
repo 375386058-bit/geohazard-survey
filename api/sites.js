@@ -1,6 +1,19 @@
 const { neon } = require('@neondatabase/serverless');
 
-const DATABASE_URL = process.env.DATABASE_URL;
+let rawUrl = process.env.DATABASE_URL;
+
+// Sanitize: strip channel_binding param which the driver doesn't understand
+if (rawUrl) {
+  try {
+    const u = new URL(rawUrl);
+    u.searchParams.delete('channel_binding');
+    rawUrl = u.toString();
+  } catch (_) {
+    // If URL parsing fails, keep rawUrl as-is
+  }
+}
+
+const DATABASE_URL = rawUrl;
 
 let tableReady = false;
 
