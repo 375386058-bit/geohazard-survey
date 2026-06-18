@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>地质灾害调查表</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="地灾调查">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#2563eb">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#f0f2f5;--card-bg:#fff;--text:#1a1a1a;--text-secondary:#666;--border:#e0e0e0;--accent:#2563eb;--accent-light:#eff6ff;--danger:#dc2626;--danger-light:#fef2f2;--success:#16a34a;--radius:10px;--shadow:0 1px 3px rgba(0,0,0,.06);--font:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100dvh;-webkit-tap-highlight-color:transparent;padding-bottom:env(safe-area-inset-bottom)}
+.page{display:none;padding:12px 14px 100px}
+.page.active{display:block}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:8px 14px;border:1px solid var(--border);border-radius:8px;background:var(--card-bg);font-size:14px;font-weight:500;color:var(--text);cursor:pointer;white-space:nowrap;transition:all .15s;-webkit-tap-highlight-color:transparent}
+.btn:active{transform:scale(.97)}
+.btn-primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn-success{background:var(--success);color:#fff;border-color:var(--success)}
+.btn-danger{background:var(--danger);color:#fff;border-color:var(--danger)}
+.btn-sm{padding:5px 8px;font-size:12px}
+.btn-icon{padding:8px;min-width:36px;justify-content:center}
+
+.list-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:6px}
+.list-header h2{font-size:16px;font-weight:600}
+.list-header .btn-group{display:flex;gap:5px;flex-wrap:wrap}
+
+.empty-state{text-align:center;padding:60px 16px;color:var(--text-secondary)}
+.empty-state svg{margin-bottom:12px;opacity:.3}
+.empty-state p{font-size:14px;margin-bottom:16px}
+
+.card-list{display:flex;flex-direction:column;gap:8px}
+.card{background:var(--card-bg);border-radius:var(--radius);box-shadow:var(--shadow);padding:12px 14px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;transition:all .15s}
+.card:active{transform:scale(.99);background:#fafafa}
+.card-info{flex:1;min-width:0}
+.card-title{font-size:15px;font-weight:600;margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.card-meta{font-size:11px;color:var(--text-secondary);display:flex;gap:10px;flex-wrap:wrap}
+.card-actions{display:flex;gap:4px;margin-left:6px;flex-shrink:0}
+
+.top-bar{display:flex;align-items:center;justify-content:space-between;padding:8px 0;margin-bottom:8px}
+.top-bar h1{font-size:15px;font-weight:600}
+
+.form-nav{display:flex;align-items:center;gap:8px;margin-bottom:2px}
+.form-nav .btn-back{font-size:20px;padding:4px 8px;border:none;background:none;color:var(--accent);cursor:pointer}
+.form-nav h2{font-size:15px;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.form-meta{display:flex;gap:14px;margin-bottom:14px;font-size:11px;color:var(--text-secondary);flex-wrap:wrap}
+
+.section{border-radius:var(--radius);overflow:hidden;margin-bottom:6px;border:1px solid var(--border);background:var(--card-bg)}
+.section-header{display:flex;align-items:center;justify-content:space-between;padding:11px 12px;cursor:pointer;user-select:none;transition:background .15s}
+.section-header:active{background:#f9f9f9}
+.section-number{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;font-size:11px;font-weight:700;margin-right:8px;flex-shrink:0}
+.section-title{flex:1;font-size:13px;font-weight:500;line-height:1.4}
+.section-arrow{font-size:11px;color:#999;transition:transform .2s;margin-left:6px}
+.section.open .section-arrow{transform:rotate(180deg)}
+.section-body{display:none;padding:0 12px 12px;border-top:1px solid var(--border)}
+.section.open .section-body{display:block}
+
+.field-group{margin-top:10px}
+.field-label{display:block;font-size:12px;font-weight:500;color:var(--text-secondary);margin-bottom:5px}
+.checkbox-grid{display:flex;flex-wrap:wrap;gap:5px}
+.chip{display:flex;align-items:center;gap:5px;padding:6px 10px;border:1.5px solid var(--border);border-radius:18px;font-size:13px;cursor:pointer;transition:all .15s;user-select:none;-webkit-tap-highlight-color:transparent}
+.chip:active{transform:scale(.96)}
+.chip.checked{background:var(--accent-light);border-color:var(--accent);color:var(--accent);font-weight:500}
+.chip-other{display:flex;align-items:center;gap:4px}
+.chip-other input{border:none;outline:none;background:transparent;font-size:13px;width:70px;font-family:inherit;color:var(--text)}
+.chip-other input::placeholder{color:#bbb}
+.text-input{width:100%;padding:9px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;font-family:inherit;background:var(--card-bg);color:var(--text);transition:border-color .15s}
+.text-input:focus{outline:none;border-color:var(--accent)}
+.text-input::placeholder{color:#bbb}
+.inline-inputs{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.inline-inputs input{width:55px;text-align:center;padding:7px 4px}
+.inline-inputs span{font-size:12px;color:var(--text-secondary)}
+.textarea{width:100%;min-height:90px;resize:vertical}
+.toolbar{position:fixed;bottom:0;left:0;right:0;background:var(--card-bg);border-top:1px solid var(--border);padding:10px 14px;display:flex;gap:8px;z-index:100;padding-bottom:max(10px,env(safe-area-inset-bottom))}
+.toolbar .btn{flex:1}
+.toast{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(.9);background:rgba(0,0,0,.78);color:#fff;padding:10px 20px;border-radius:8px;font-size:14px;z-index:9999;opacity:0;pointer-events:none;transition:all .2s}
+.toast.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:200;display:none;align-items:center;justify-content:center}
+.modal-overlay.active{display:flex}
+.modal{background:var(--card-bg);border-radius:var(--radius);padding:18px;width:92%;max-width:400px;box-shadow:0 8px 32px rgba(0,0,0,.15)}
+.modal h3{font-size:15px;margin-bottom:10px}
+.modal input{margin-bottom:10px}
+.modal textarea{width:100%;min-height:180px;margin-bottom:10px;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-family:var(--font);resize:vertical}
+.modal textarea:focus{outline:none;border-color:var(--accent)}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end}
+.import-status{font-size:12px;margin-bottom:8px;padding:6px 10px;border-radius:6px;display:none}
+.import-status.ok{display:block;background:#ecfdf5;color:#065f46}
+.import-status.warn{display:block;background:#fef3c7;color:#92400e}
+.install-bar{display:none;align-items:center;gap:6px;padding:8px 12px;background:var(--accent-light);border-radius:8px;margin-bottom:10px;font-size:12px;color:var(--accent)}
+.install-bar.show{display:flex}
+</style>
+</head>
+<body>
+
+<!-- 列表页 -->
+<div class="page active" id="page-list">
+  <div class="top-bar">
+    <h1>📋 地质灾害调查表</h1>
+    <button class="btn btn-sm btn-primary" onclick="addSite()">＋ 新建</button>
+  </div>
+  <div class="install-bar" id="install-bar">
+    <span>💡</span><span style="flex:1">可安装到手机桌面，离线使用</span>
+    <button class="btn btn-sm btn-primary" id="btn-install" style="display:none">安装</button>
+  </div>
+  <div class="list-header">
+    <h2 id="list-count">调查点 (0)</h2>
+    <div class="btn-group">
+      <button class="btn btn-sm" onclick="showImportModal()">📥 导入</button>
+      <button class="btn btn-sm" onclick="exportAllJson()">📤 导出</button>
+      <button class="btn btn-sm btn-success" onclick="exportAllExcel()">📊 Excel</button>
+    </div>
+  </div>
+  <div class="empty-state" id="empty-state">
+    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 12h6m-3-3v6m-7 4h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2z"/></svg>
+    <p>暂无调查点</p>
+    <button class="btn btn-primary btn-sm" onclick="addSite()">＋ 新建调查点</button>
+  </div>
+  <div class="card-list" id="site-list"></div>
+  <div style="height:80px"></div>
+</div>
+
+<!-- 表单页 -->
+<div class="page" id="page-form">
+  <div class="form-nav">
+    <button class="btn-back" onclick="goHome()">←</button>
+    <h2 id="form-title">调查表</h2>
+    <button class="btn btn-sm" onclick="exportSiteJson()" title="导出JSON">📤</button>
+    <button class="btn btn-sm btn-success" onclick="exportSiteExcel()" title="导出Excel">📊</button>
+  </div>
+  <div class="form-meta" id="form-meta"></div>
+  <div id="form-sections"></div>
+  <div class="toolbar">
+    <button class="btn" onclick="goHome()">返回列表</button>
+    <button class="btn btn-primary" onclick="saveForm()">💾 保存</button>
+  </div>
+</div>
+
+<!-- 新建弹窗 -->
+<div class="modal-overlay" id="modal-new">
+  <div class="modal">
+    <h3>新建调查点</h3>
+    <input class="text-input" id="input-site-name" placeholder="输入地点名称，如：王家村后山滑坡" autocomplete="off">
+    <div class="modal-actions">
+      <button class="btn" onclick="closeNewModal()">取消</button>
+      <button class="btn btn-primary" onclick="confirmAddSite()">确定</button>
+    </div>
+  </div>
+</div>
+
+<!-- 导入弹窗 -->
+<div class="modal-overlay" id="modal-import">
+  <div class="modal">
+    <h3>导入数据</h3>
+    <p style="font-size:11px;color:var(--text-secondary);margin-bottom:8px">粘贴其他手机导出的JSON，同名点会跳过</p>
+    <div class="import-status" id="import-status"></div>
+    <textarea class="text-input" id="input-import-json" placeholder="在此粘贴 JSON 数据..."></textarea>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeImportModal()">取消</button>
+      <button class="btn btn-primary" onclick="confirmImport()">导入</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ============ 数据模型 ============
+var FIELDS = [
+  {id:1,name:'乡镇与野外编号',type:'text',key:'villageCode',placeholder:'请输入乡镇与野外编号'},
+  {id:2,name:'确定类型',type:'checkbox',key:'disasterType',options:['崩塌','滑坡（灾害点）','孕灾点','解译点']},
+  {id:3,name:'总体地貌与微地貌',type:'double_checkbox',keys:['landformMacro','landformMicro'],
+    groups:[{label:'总体地貌',key:'landformMacro',options:['平原','丘陵','低山','中山']},{label:'微地貌',key:'landformMicro',options:['陡崖','陡坡','缓坡','平台']}]},
+  {id:4,name:'岩体结构',type:'checkbox',key:'rockStructure',options:['整体块状结构','层状结构','碎裂结构','散体结构']},
+  {id:5,name:'斜坡结构',type:'checkbox',key:'slopeStructure',options:['土质','岩质','土石混合']},
+  {id:6,name:'斜坡类型（石质斜坡填写）',type:'checkbox',key:'slopeType',options:['顺向坡','切向坡','横向坡','逆向坡','近水平层斜坡','块状岩体斜坡']},
+  {id:7,name:'坡面形态',type:'checkbox',key:'slopeShape',options:['凹-凸型','凸型','阶梯型','直型','凹型']},
+  {id:8,name:'岩层产状（倾向与倾角）',type:'measure_triple',keys:['stratumDip','stratumDipAngle','stratumLength','stratumSpacing'],
+    measures:[{label:'倾向',key:'stratumDip',unit:'°'},{label:'倾角',key:'stratumDipAngle',unit:'°'},{label:'长度',key:'stratumLength',unit:'m'},{label:'间距',key:'stratumSpacing',unit:'m'}]},
+  {id:9,name:'裂隙产状1（倾向与倾角）',type:'measure_triple',keys:['fissure1Dip','fissure1DipAngle','fissure1Length','fissure1Spacing'],
+    measures:[{label:'倾向',key:'fissure1Dip',unit:'°'},{label:'倾角',key:'fissure1DipAngle',unit:'°'},{label:'长度',key:'fissure1Length',unit:'m'},{label:'间距',key:'fissure1Spacing',unit:'m'}]},
+  {id:10,name:'裂隙产状2（倾向与倾角）',type:'measure_triple',keys:['fissure2Dip','fissure2DipAngle','fissure2Length','fissure2Spacing'],
+    measures:[{label:'倾向',key:'fissure2Dip',unit:'°'},{label:'倾角',key:'fissure2DipAngle',unit:'°'},{label:'长度',key:'fissure2Length',unit:'m'},{label:'间距',key:'fissure2Spacing',unit:'m'}]},
+  {id:11,name:'裂隙分割的岩石块度(长×宽×高)(m)',type:'triple_input',keys:['rockBlockL','rockBlockW','rockBlockH'],units:['长','宽','高']},
+  {id:12,name:'岩体（土体）裂隙发育情况',type:'measure_triple',keys:['fissureGroups','fissureLength','fissureWidth','fissureDensity'],
+    measures:[{label:'裂隙组数',key:'fissureGroups',unit:'组'},{label:'裂隙长',key:'fissureLength',unit:'米'},{label:'宽',key:'fissureWidth',unit:'米'},{label:'密度',key:'fissureDensity',unit:'条/米'}]},
+  {id:13,name:'有无下滑的堆积物、如有记录其形状和体积',type:'mixed_checkbox_triple',checkboxKey:'debrisShape',checkboxOptions:['扇形','锥形','其他'],tripleKeys:['debrisVolumeL','debrisVolumeW','debrisVolumeH'],tripleUnits:['长','宽','高']},
+  {id:14,name:'人类工程活动与土地利用类型',type:'checkbox_other',key:'humanActivity',options:['切坡建房','切坡修路','村庄建设用地','交通用地','耕地','林地'],otherKey:'humanActivityOther'},
+  {id:15,name:'地表水',type:'checkbox_other',key:'surfaceWater',options:['河流','水库'],otherKey:'surfaceWaterOther'},
+  {id:16,name:'植被类型与覆盖率',type:'checkbox_number',key:'vegetationType',options:['乔木','灌木','草本'],numberKey:'vegetationCoverage',numberUnit:'%',numberPlaceholder:'覆盖率'},
+  {id:17,name:'有无树木歪斜、建筑裂缝、地面裂缝',type:'checkbox',key:'damageSigns',options:['树木歪斜','建筑裂缝','地面裂缝']},
+  {id:18,name:'威胁人数（人）与威胁财产（万元）',type:'dual_number',keys:['threatPeople','threatProperty'],labels:['威胁人数','威胁财产'],units:['人','万元']},
+  {id:19,name:'孕灾点类型',type:'checkbox',key:'disasterPointType',options:['地质构造点','工程地质岩组点','崩滑易滑地层点','其他点','斜坡结构点']}
+];
+var EXTRA_FIELDS = [
+  {id:20,name:'变形破坏情况及其他补充内容',key:'extraNotes',type:'textarea',placeholder:'以前发生灾害的时间、伤亡情况等'},
+  {id:21,name:'孕灾点沿途观测内容',key:'observationNotes',type:'textarea',placeholder:'沿途观测内容'}
+];
+
+function defaultFormData() {
+  return {
+    villageCode:'',disasterType:[],landformMacro:[],landformMicro:[],
+    rockStructure:[],slopeStructure:[],slopeType:[],slopeShape:[],
+    stratumDip:'',stratumDipAngle:'',stratumLength:'',stratumSpacing:'',
+    fissure1Dip:'',fissure1DipAngle:'',fissure1Length:'',fissure1Spacing:'',
+    fissure2Dip:'',fissure2DipAngle:'',fissure2Length:'',fissure2Spacing:'',
+    rockBlockL:'',rockBlockW:'',rockBlockH:'',
+    fissureGroups:'',fissureLength:'',fissureWidth:'',fissureDensity:'',
+    debrisShape:[],debrisVolumeL:'',debrisVolumeW:'',debrisVolumeH:'',
+    humanActivity:[],humanActivityOther:'',surfaceWater:[],surfaceWaterOther:'',
+    vegetationType:[],vegetationCoverage:'',damageSigns:[],
+    threatPeople:'',threatProperty:'',disasterPointType:[],
+    extraNotes:'',observationNotes:''
+  };
+}
+
+// ============ 存储 ============
+function loadSites() {
+  try { return JSON.parse(localStorage.getItem('geohazard_offline_sites')) || []; }
+  catch(e) { return []; }
+}
+function saveSites(sites) {
+  localStorage.setItem('geohazard_offline_sites', JSON.stringify(sites));
+}
+
+// ============ 工具 ============
+var toastTimer;
+function showToast(msg) {
+  var el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function(){ el.classList.remove('show'); }, 1600);
+}
+function escHtml(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function escAttr(s) { return (s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function countFilled(data) {
+  var n=0;
+  if(data.villageCode)n++; if(data.disasterType.length)n++; if(data.landformMacro.length||data.landformMicro.length)n++;
+  if(data.rockStructure.length)n++; if(data.slopeStructure.length)n++; if(data.slopeType.length)n++; if(data.slopeShape.length)n++;
+  if(data.stratumDip||data.stratumDipAngle)n++; if(data.fissure1Dip||data.fissure1DipAngle)n++; if(data.fissure2Dip||data.fissure2DipAngle)n++;
+  if(data.rockBlockL||data.rockBlockW||data.rockBlockH)n++; if(data.fissureGroups||data.fissureLength)n++;
+  if(data.debrisShape.length||data.debrisVolumeL)n++; if(data.humanActivity.length||data.humanActivityOther)n++;
+  if(data.surfaceWater.length||data.surfaceWaterOther)n++; if(data.vegetationType.length||data.vegetationCoverage)n++;
+  if(data.damageSigns.length)n++; if(data.threatPeople||data.threatProperty)n++; if(data.disasterPointType.length)n++;
+  return n;
+}
+
+var _uid = Date.now().toString(36);
+function genId() { return (_uid++) + Math.random().toString(36).slice(2,6); }
+
+// ============ 首页 ============
+var sitesCache = loadSites();
+var currentSiteId = null;
+
+function refreshList() {
+  sitesCache = loadSites();
+  renderSiteList();
+}
+
+function renderSiteList() {
+  var listEl = document.getElementById('site-list');
+  var emptyEl = document.getElementById('empty-state');
+  var countEl = document.getElementById('list-count');
+  countEl.textContent = '调查点 (' + sitesCache.length + ')';
+  if (sitesCache.length === 0) {
+    listEl.innerHTML = ''; emptyEl.style.display = 'block'; return;
+  }
+  emptyEl.style.display = 'none';
+  listEl.innerHTML = sitesCache.map(function(s){
+    var t = s.updatedAt ? new Date(s.updatedAt).toLocaleString('zh-CN') : '未填写';
+    var f = countFilled(s.data);
+    return '<div class="card" onclick="openSite(\''+s.id+'\')">'+
+      '<div class="card-info"><div class="card-title">'+escHtml(s.name||'未命名')+'</div>'+
+      '<div class="card-meta"><span>'+(s.data&&s.data.villageCode?escHtml(s.data.villageCode):'暂无编号')+'</span>'+
+      '<span>已完成 '+f+'/19 项</span><span>'+t+'</span></div></div>'+
+      '<div class="card-actions" onclick="event.stopPropagation()">'+
+      '<button class="btn btn-sm btn-icon" onclick="exportSingleJson(\''+s.id+'\')" title="导出JSON">📤</button>'+
+      '<button class="btn btn-sm btn-icon" onclick="exportSingleExcel(\''+s.id+'\')" title="导出Excel">📊</button>'+
+      '<button class="btn btn-sm btn-icon btn-danger" onclick="deleteSite(\''+s.id+'\')">✕</button></div></div>';
+  }).join('');
+}
+
+function addSite() {
+  document.getElementById('modal-new').classList.add('active');
+  document.getElementById('input-site-name').value = '';
+  setTimeout(function(){ document.getElementById('input-site-name').focus(); }, 100);
+}
+function closeNewModal() { document.getElementById('modal-new').classList.remove('active'); }
+
+function confirmAddSite() {
+  var name = document.getElementById('input-site-name').value.trim();
+  if (!name) { showToast('请输入地点名称'); return; }
+  var site = { id: genId(), name: name, data: defaultFormData(), createdAt: Date.now(), updatedAt: Date.now() };
+  sitesCache.unshift(site);
+  saveSites(sitesCache);
+  closeNewModal(); renderSiteList(); openSite(site.id);
+}
+
+function deleteSite(id) {
+  if (!confirm('确定删除？数据不可恢复。')) return;
+  sitesCache = sitesCache.filter(function(s){ return s.id !== id; });
+  saveSites(sitesCache);
+  renderSiteList();
+  if (currentSiteId === id) goHome();
+  showToast('已删除');
+}
+
+// ============ 导航 ============
+function openSite(id) {
+  currentSiteId = id;
+  var site = sitesCache.find(function(s){ return s.id === id; });
+  if (!site) { showToast('数据不存在'); return; }
+  document.getElementById('page-list').classList.remove('active');
+  document.getElementById('page-form').classList.add('active');
+  document.getElementById('form-title').textContent = site.name;
+  document.getElementById('form-meta').textContent = '创建：' + new Date(site.createdAt).toLocaleString('zh-CN') + ' ｜ 更新：' + new Date(site.updatedAt).toLocaleString('zh-CN');
+  buildForm(site.data);
+  window.scrollTo(0, 0);
+}
+
+function goHome() {
+  saveForm(true); currentSiteId = null;
+  document.getElementById('page-form').classList.remove('active');
+  document.getElementById('page-list').classList.add('active');
+  refreshList(); window.scrollTo(0, 0);
+}
+
+// ============ 表单构建 ============
+function buildForm(data) {
+  var html = '';
+  FIELDS.forEach(function(f){ html += buildField(f, data); });
+  EXTRA_FIELDS.forEach(function(f){ html += buildExtraField(f, data); });
+  document.getElementById('form-sections').innerHTML = html;
+  document.querySelectorAll('.section-header').forEach(function(h){
+    h.addEventListener('click', function(){ this.parentElement.classList.toggle('open'); });
+  });
+  document.querySelectorAll('.chip').forEach(function(c){
+    c.addEventListener('click', function(e){
+      if (e.target.tagName === 'INPUT') return;
+      this.classList.toggle('checked');
+    });
+  });
+  var first = document.querySelector('.section'); if (first) first.classList.add('open');
+}
+
+function buildField(f, data) {
+  var body = '';
+  switch(f.type) {
+    case 'text':
+      body = '<div class="field-group"><input class="text-input" data-key="'+f.key+'" value="'+escAttr(data[f.key]||'')+'" placeholder="'+(f.placeholder||'')+'"></div>'; break;
+    case 'checkbox':
+      body = '<div class="field-group"><div class="checkbox-grid">'+f.options.map(function(o){ var c=(data[f.key]||[]).indexOf(o)>=0; return '<div class="chip'+(c?' checked':'')+'" data-key="'+f.key+'" data-val="'+escAttr(o)+'">'+o+'</div>'; }).join('')+'</div></div>'; break;
+    case 'double_checkbox':
+      body = f.groups.map(function(g){ return '<div class="field-group"><div class="field-label">'+g.label+'</div><div class="checkbox-grid">'+g.options.map(function(o){ var c=(data[g.key]||[]).indexOf(o)>=0; return '<div class="chip'+(c?' checked':'')+'" data-key="'+g.key+'" data-val="'+escAttr(o)+'">'+o+'</div>'; }).join('')+'</div></div>'; }).join(''); break;
+    case 'measure_triple':
+      body = '<div class="field-group"><div class="inline-inputs">'+f.measures.map(function(m){ return '<span>'+m.label+'</span><input class="text-input" data-key="'+m.key+'" value="'+escAttr(data[m.key]||'')+'" style="width:55px"><span>'+m.unit+'</span>'; }).join('')+'</div></div>'; break;
+    case 'triple_input':
+      body = '<div class="field-group"><div class="inline-inputs">'+f.units.map(function(u,i){ return '<span>'+u+'</span><input class="text-input" data-key="'+f.keys[i]+'" value="'+escAttr(data[f.keys[i]]||'')+'" placeholder="m" style="width:55px">'; }).join('')+'</div></div>'; break;
+    case 'mixed_checkbox_triple':
+      body = '<div class="field-group"><div class="field-label">形状</div><div class="checkbox-grid">'+f.checkboxOptions.map(function(o){ var c=(data[f.checkboxKey]||[]).indexOf(o)>=0; return '<div class="chip'+(c?' checked':'')+'" data-key="'+f.checkboxKey+'" data-val="'+escAttr(o)+'">'+o+'</div>'; }).join('')+'</div></div><div class="field-group"><div class="field-label">体积（长×宽×高）</div><div class="inline-inputs">'+f.tripleUnits.map(function(u,i){ return '<span>'+u+'</span><input class="text-input" data-key="'+f.tripleKeys[i]+'" value="'+escAttr(data[f.tripleKeys[i]]||'')+'" placeholder="m" style="width:55px">'; }).join('')+'</div></div>'; break;
+    case 'checkbox_other':
+      body = '<div class="field-group"><div class="checkbox-grid">'+f.options.map(function(o){ var c=(data[f.key]||[]).indexOf(o)>=0; return '<div class="chip'+(c?' checked':'')+'" data-key="'+f.key+'" data-val="'+escAttr(o)+'">'+o+'</div>'; }).join('')+'<div class="chip chip-other"><span>其他</span><input data-key="'+f.otherKey+'" value="'+escAttr(data[f.otherKey]||'')+'" placeholder="请填写"></div></div></div>'; break;
+    case 'checkbox_number':
+      body = '<div class="field-group"><div class="checkbox-grid">'+f.options.map(function(o){ var c=(data[f.key]||[]).indexOf(o)>=0; return '<div class="chip'+(c?' checked':'')+'" data-key="'+f.key+'" data-val="'+escAttr(o)+'">'+o+'</div>'; }).join('')+'</div></div><div class="field-group"><div class="field-label">'+(f.numberPlaceholder||'覆盖率')+'</div><div class="inline-inputs"><input class="text-input" data-key="'+f.numberKey+'" value="'+escAttr(data[f.numberKey]||'')+'" style="width:70px"><span>'+(f.numberUnit||'')+'</span></div></div>'; break;
+    case 'dual_number':
+      body = '<div class="field-group"><div class="inline-inputs">'+f.labels.map(function(l,i){ return '<span>'+l+'</span><input class="text-input" data-key="'+f.keys[i]+'" value="'+escAttr(data[f.keys[i]]||'')+'" style="width:70px"><span>'+f.units[i]+'</span>'; }).join('')+'</div></div>'; break;
+  }
+  return '<div class="section"><div class="section-header"><div style="display:flex;align-items:center;flex:1;min-width:0"><span class="section-number">'+f.id+'</span><span class="section-title">'+f.name+'</span></div><span class="section-arrow">▼</span></div><div class="section-body">'+body+'</div></div>';
+}
+
+function buildExtraField(f, data) {
+  return '<div class="section"><div class="section-header"><div style="display:flex;align-items:center;flex:1;min-width:0"><span class="section-number">'+f.id+'</span><span class="section-title">'+f.name+'</span></div><span class="section-arrow">▼</span></div><div class="section-body"><div class="field-group"><textarea class="text-input textarea" data-key="'+f.key+'" placeholder="'+(f.placeholder||'')+'">'+escHtml(data[f.key]||'')+'</textarea></div></div></div>';
+}
+
+// ============ 表单读写 ============
+function readFormData() {
+  var data = defaultFormData();
+  document.querySelectorAll('#form-sections [data-key]').forEach(function(el){
+    var key = el.getAttribute('data-key');
+    if (el.tagName === 'TEXTAREA') data[key] = el.value;
+    else if (el.type === 'text' || el.tagName === 'INPUT') data[key] = el.value;
+  });
+  var chipMap = {};
+  document.querySelectorAll('#form-sections .chip.checked').forEach(function(c){
+    var key = c.getAttribute('data-key'), val = c.getAttribute('data-val');
+    if (!key || !val) return;
+    if (!chipMap[key]) chipMap[key] = [];
+    if (chipMap[key].indexOf(val) < 0) chipMap[key].push(val);
+  });
+  document.querySelectorAll('#form-sections .chip-other input').forEach(function(el){
+    var key = el.getAttribute('data-key');
+    if (key && el.value.trim()) {
+      if (!chipMap[key]) chipMap[key] = [];
+      chipMap[key].push(el.value.trim());
+    }
+  });
+  Object.keys(chipMap).forEach(function(k){ data[k] = chipMap[k]; });
+  return data;
+}
+
+function saveForm(silent) {
+  if (!currentSiteId) return;
+  var idx = sitesCache.findIndex(function(s){ return s.id === currentSiteId; });
+  if (idx < 0) return;
+  sitesCache[idx].data = readFormData();
+  sitesCache[idx].updatedAt = Date.now();
+  saveSites(sitesCache);
+  document.getElementById('form-meta').textContent = '创建：' + new Date(sitesCache[idx].createdAt).toLocaleString('zh-CN') + ' ｜ 更新：' + new Date(sitesCache[idx].updatedAt).toLocaleString('zh-CN');
+  if (!silent) showToast('已保存');
+}
+
+// ============ JSON 导入导出 ============
+function exportSiteJson() {
+  if (!currentSiteId) return;
+  saveForm(true);
+  var s = sitesCache.find(function(x){ return x.id === currentSiteId; });
+  if (s) downloadJson([s]);
+}
+function exportSingleJson(id) {
+  var s = sitesCache.find(function(x){ return x.id === id; });
+  if (s) downloadJson([s]);
+}
+function exportAllJson() {
+  if (sitesCache.length === 0) { showToast('暂无数据'); return; }
+  downloadJson(sitesCache);
+}
+function downloadJson(data) {
+  var text = JSON.stringify(data, null, 2);
+  // Try clipboard first on mobile
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(function(){
+      showToast('已复制到剪贴板，可粘贴到微信发送');
+    }).catch(function(){ doDownload(text); });
+  } else { doDownload(text); }
+}
+function doDownload(text) {
+  var blob = new Blob([text], {type:'application/json'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = '地灾调查数据_' + new Date().toISOString().slice(0,10) + '.json';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url); showToast('已下载JSON文件');
+}
+
+function showImportModal() {
+  document.getElementById('modal-import').classList.add('active');
+  document.getElementById('input-import-json').value = '';
+  document.getElementById('import-status').className = 'import-status';
+  setTimeout(function(){ document.getElementById('input-import-json').focus(); }, 100);
+}
+function closeImportModal() { document.getElementById('modal-import').classList.remove('active'); }
+
+function confirmImport() {
+  var raw = document.getElementById('input-import-json').value.trim();
+  if (!raw) { showToast('请粘贴数据'); return; }
+  var imported, statusEl = document.getElementById('import-status');
+  try { imported = JSON.parse(raw); } catch(e) {
+    statusEl.className = 'import-status warn'; statusEl.textContent = 'JSON格式错误，请检查'; return;
+  }
+  if (!Array.isArray(imported)) imported = [imported];
+  var added = 0, skipped = 0;
+  for (var i = 0; i < imported.length; i++) {
+    var item = imported[i];
+    if (!item.name || !item.data) continue;
+    var exists = sitesCache.find(function(s){ return s.name === item.name; });
+    if (exists) { skipped++; continue; }
+    var site = {
+      id: genId(), name: item.name, data: item.data,
+      createdAt: item.createdAt || Date.now(), updatedAt: item.updatedAt || Date.now()
+    };
+    sitesCache.push(site); added++;
+  }
+  saveSites(sitesCache);
+  statusEl.className = 'import-status ok';
+  statusEl.textContent = '导入成功！新增 ' + added + ' 个，跳过 ' + skipped + ' 个（重复）';
+  renderSiteList();
+  setTimeout(closeImportModal, 1500);
+}
+
+// ============ Excel 导出（内嵌生成器，无需外部库）============
+function exportSiteExcel() {
+  if (!currentSiteId) return;
+  saveForm(true);
+  exportSingleExcel(currentSiteId);
+}
+function exportSingleExcel(id) {
+  var s = sitesCache.find(function(x){ return x.id === id; });
+  if (s) { generateExcel([s]); showToast('Excel已下载'); }
+}
+function exportAllExcel() {
+  if (sitesCache.length === 0) { showToast('暂无数据'); return; }
+  generateExcel(sitesCache); showToast('Excel已下载');
+}
+
+// -- 最小 ZIP 生成器 --
+function crc32(data) {
+  var crc = -1;
+  for (var i = 0; i < data.length; i++) {
+    crc ^= data[i];
+    for (var j = 0; j < 8; j++) crc = (crc >>> 1) ^ (crc & 1 ? 0xEDB88320 : 0);
+  }
+  return (crc ^ -1) >>> 0;
+}
+
+function zipStore(files) {
+  // files: [{name, data: Uint8Array}]
+  var localHeaders = [];
+  var centralHeaders = [];
+  var offset = 0;
+  var fileData = [];
+
+  for (var i = 0; i < files.length; i++) {
+    var nameBytes = new TextEncoder().encode(files[i].name);
+    var data = files[i].data;
+    var crc = crc32(data);
+
+    // Local file header
+    var lh = new Uint8Array(30 + nameBytes.length);
+    var v = new DataView(lh.buffer);
+    v.setUint32(0, 0x04034b50, true); // signature
+    v.setUint16(4, 20, true);          // version needed
+    v.setUint16(6, 0, true);           // flags
+    v.setUint16(8, 0, true);           // compression: store
+    v.setUint16(10, 0, true);          // mod time
+    v.setUint16(12, 0, true);          // mod date
+    v.setUint32(14, crc, true);        // crc32
+    v.setUint32(18, data.length, true); // compressed size
+    v.setUint32(22, data.length, true); // uncompressed size
+    v.setUint16(26, nameBytes.length, true); // filename length
+    v.setUint16(28, 0, true);          // extra field length
+    lh.set(nameBytes, 30);
+    localHeaders.push(lh);
+    fileData.push(data);
+
+    // Central directory header
+    var ch = new Uint8Array(46 + nameBytes.length);
+    var cv = new DataView(ch.buffer);
+    cv.setUint32(0, 0x02014b50, true);  // signature
+    cv.setUint16(4, 20, true);          // version made by
+    cv.setUint16(6, 20, true);          // version needed
+    cv.setUint16(8, 0, true);           // flags
+    cv.setUint16(10, 0, true);          // compression
+    cv.setUint16(12, 0, true);          // mod time
+    cv.setUint16(14, 0, true);          // mod date
+    cv.setUint32(16, crc, true);        // crc32
+    cv.setUint32(20, data.length, true);
+    cv.setUint32(24, data.length, true);
+    cv.setUint16(28, nameBytes.length, true);
+    cv.setUint16(30, 0, true);          // extra field length
+    cv.setUint16(32, 0, true);          // file comment length
+    cv.setUint16(34, 0, true);          // disk number start
+    cv.setUint16(36, 0, true);          // internal attrs
+    cv.setUint32(38, 0, true);          // external attrs
+    cv.setUint32(42, offset, true);     // local header offset
+    ch.set(nameBytes, 46);
+    centralHeaders.push(ch);
+
+    offset += lh.length + data.length;
+  }
+
+  var centralStart = offset;
+  var centralSize = 0;
+  var endBytes = new Uint8Array(0);
+
+  for (var j = 0; j < centralHeaders.length; j++) {
+    var tmp = new Uint8Array(endBytes.length + centralHeaders[j].length);
+    tmp.set(endBytes); tmp.set(centralHeaders[j], endBytes.length);
+    endBytes = tmp;
+    centralSize += centralHeaders[j].length;
+  }
+
+  // End of central directory
+  var eocd = new Uint8Array(22);
+  var ev = new DataView(eocd.buffer);
+  ev.setUint32(0, 0x06054b50, true);
+  ev.setUint16(4, 0, true);
+  ev.setUint16(6, 0, true);
+  ev.setUint16(8, files.length, true);
+  ev.setUint16(10, files.length, true);
+  ev.setUint32(12, centralSize, true);
+  ev.setUint32(16, centralStart, true);
+  ev.setUint16(20, 0, true);
+
+  var totalLen = offset + centralSize + 22;
+  var zip = new Uint8Array(totalLen);
+  var pos = 0;
+  for (var k = 0; k < files.length; k++) {
+    zip.set(localHeaders[k], pos); pos += localHeaders[k].length;
+    zip.set(fileData[k], pos); pos += fileData[k].length;
+  }
+  zip.set(endBytes, pos); pos += endBytes.length;
+  zip.set(eocd, pos);
+
+  return zip;
+}
+
+function escapeXml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function generateExcel(sites) {
+  var rows = [['序号','项目名称','选项内容']];
+
+  sites.forEach(function(site){
+    var d = site.data || {};
+    rows.push(['','调查点：'+site.name,''],['','更新时间：'+new Date(site.updatedAt).toLocaleString('zh-CN'),'']);
+    rows.push([1,'乡镇与野外编号',d.villageCode||'']);
+    rows.push([2,'确定类型：','□崩塌 □滑坡（灾害点） □孕灾点 □解译点']);
+    if((d.disasterType||[]).length) rows.push(['','','【已选：'+d.disasterType.join('、')+'】']);
+    rows.push([3,'总体地貌与微地貌','总体地貌：□平原 □丘陵 □低山 □中山']);
+    if((d.landformMacro||[]).length) rows.push(['','','  已选：'+d.landformMacro.join('、')]);
+    rows.push(['','','微地貌：□陡崖 □陡坡 □缓坡 □平台']);
+    if((d.landformMicro||[]).length) rows.push(['','','  已选：'+d.landformMicro.join('、')]);
+    rows.push([4,'岩体结构','□整体块状结构 □层状结构 □碎裂结构 □散体结构']);
+    if((d.rockStructure||[]).length) rows.push(['','','已选：'+d.rockStructure.join('、')]);
+    rows.push([5,'斜坡结构','□土质 □岩质 □土石混合']);
+    if((d.slopeStructure||[]).length) rows.push(['','','已选：'+d.slopeStructure.join('、')]);
+    rows.push([6,'斜坡类型（石质斜坡填写）','□顺向坡 □切向坡 □横向坡 □逆向坡 □近水平层斜坡 □块状岩体斜坡']);
+    if((d.slopeType||[]).length) rows.push(['','','已选：'+d.slopeType.join('、')]);
+    rows.push([7,'坡面形态','□凹-凸型 □凸型 □阶梯型 □直型 □凹型']);
+    if((d.slopeShape||[]).length) rows.push(['','','已选：'+d.slopeShape.join('、')]);
+    rows.push([8,'岩层产状（倾向与倾角）',(d.stratumDip||'____')+'°<'+(d.stratumDipAngle||'____')+'°']);
+    rows.push(['','','长度：'+(d.stratumLength||'____')+' m']);
+    rows.push(['','','间距：'+(d.stratumSpacing||'____')+' m']);
+    rows.push([9,'裂隙产状1（倾向与倾角）',(d.fissure1Dip||'____')+'°<'+(d.fissure1DipAngle||'____')+'°']);
+    rows.push(['','','长度：'+(d.fissure1Length||'____')+' m']);
+    rows.push(['','','间距：'+(d.fissure1Spacing||'____')+' m']);
+    rows.push([10,'裂隙产状2（倾向与倾角）',(d.fissure2Dip||'____')+'°<'+(d.fissure2DipAngle||'____')+'°']);
+    rows.push(['','','长度：'+(d.fissure2Length||'____')+' m']);
+    rows.push(['','','间距：'+(d.fissure2Spacing||'____')+' m']);
+    rows.push([11,'裂隙分割的岩石块度(长×宽×高)(m)',(d.rockBlockL||'____')+' × '+(d.rockBlockW||'____')+' × '+(d.rockBlockH||'____')]);
+    rows.push([12,'岩体（土体）裂隙发育情况','裂隙组数：'+(d.fissureGroups||'____')+' 组']);
+    rows.push(['','','裂隙长 '+(d.fissureLength||'____')+' 米']);
+    rows.push(['','','宽 '+(d.fissureWidth||'____')+' 米']);
+    rows.push(['','','密度 '+(d.fissureDensity||'____')+' 条/米']);
+    rows.push([13,'有无下滑的堆积物、如有记录其形状和体积','形状：□扇形 □锥形 □其他']);
+    if((d.debrisShape||[]).length) rows.push(['','','  已选：'+d.debrisShape.join('、')]);
+    rows.push(['','','体积：(长×宽×高)(m) '+(d.debrisVolumeL||'____')+' × '+(d.debrisVolumeW||'____')+' × '+(d.debrisVolumeH||'____')]);
+    rows.push([14,'人类工程活动与土地利用类型','□切坡建房 □切坡修路 □村庄建设用地 □交通用地 □耕地 □林地'+(d.humanActivityOther?' □其他'+d.humanActivityOther:'')]);
+    if((d.humanActivity||[]).length) rows.push(['','','已选：'+d.humanActivity.join('、')]);
+    rows.push([15,'地表水','□河流 □水库'+(d.surfaceWaterOther?' □其他'+d.surfaceWaterOther:'')]);
+    if((d.surfaceWater||[]).length) rows.push(['','','已选：'+d.surfaceWater.join('、')]);
+    rows.push([16,'植被类型与覆盖率','□乔木 □灌木 □草本']);
+    if((d.vegetationType||[]).length) rows.push(['','','已选：'+d.vegetationType.join('、')]);
+    rows.push(['','','覆盖率：'+(d.vegetationCoverage||'____')+' %']);
+    rows.push([17,'有无树木歪斜、建筑裂缝、地面裂缝','□树木歪斜 □建筑裂缝 □地面裂缝']);
+    if((d.damageSigns||[]).length) rows.push(['','','已选：'+d.damageSigns.join('、')]);
+    rows.push([18,'威胁人数（人）与威胁财产（万元）','威胁人数：'+(d.threatPeople||'____')+' 人']);
+    rows.push(['','','威胁财产：'+(d.threatProperty||'____')+' 万元']);
+    rows.push([19,'孕灾点类型','□地质构造点 □工程地质岩组点 □崩滑易滑地层点 □其他点 □斜坡结构点']);
+    if((d.disasterPointType||[]).length) rows.push(['','','已选：'+d.disasterPointType.join('、')]);
+    rows.push(['','变形破坏情况及其他补充内容：',d.extraNotes||'']);
+    rows.push(['','孕灾点沿途观测内容：',d.observationNotes||'']);
+    rows.push(['','','']);
+  });
+
+  // Build shared strings
+  var sst = [];
+  var sstMap = {};
+  function getSstIdx(s) {
+    s = String(s);
+    if (sstMap[s] !== undefined) return sstMap[s];
+    var idx = sst.length;
+    sst.push(s);
+    sstMap[s] = idx;
+    return idx;
+  }
+
+  // Build sheet XML
+  var sheetXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>';
+  for (var r = 0; r < rows.length; r++) {
+    sheetXml += '<row r="'+(r+1)+'">';
+    for (var c = 0; c < 3; c++) {
+      var val = rows[r][c] !== undefined ? String(rows[r][c]) : '';
+      var idx = getSstIdx(val);
+      sheetXml += '<c r="'+('ABC'[c])+(r+1)+'" t="s"><v>'+idx+'</v></c>';
+    }
+    sheetXml += '</row>';
+  }
+  sheetXml += '</sheetData></worksheet>';
+
+  // Shared strings XML
+  var sstXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="'+sst.length+'" uniqueCount="'+sst.length+'">';
+  for (var si = 0; si < sst.length; si++) {
+    sstXml += '<si><t xml:space="preserve">'+escapeXml(sst[si])+'</t></si>';
+  }
+  sstXml += '</sst>';
+
+  // Other XML parts
+  var contentTypes = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>';
+
+  var rels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>';
+
+  var wbRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="sharedStrings.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>';
+
+  var workbook = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="地质灾害调查表" sheetId="1" r:id="rId1"/></sheets></workbook>';
+
+  var styles = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="1"><font><sz val="11"/><name val="宋体"/></font></fonts><fills count="1"><fill><patternFill patternType="none"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/></cellXfs></styleSheet>';
+
+  var enc = new TextEncoder();
+  var zipFiles = [
+    {name: '[Content_Types].xml', data: enc.encode(contentTypes)},
+    {name: '_rels/.rels', data: enc.encode(rels)},
+    {name: 'xl/workbook.xml', data: enc.encode(workbook)},
+    {name: 'xl/_rels/workbook.xml.rels', data: enc.encode(wbRels)},
+    {name: 'xl/worksheets/sheet1.xml', data: enc.encode(sheetXml)},
+    {name: 'xl/sharedStrings.xml', data: enc.encode(sstXml)},
+    {name: 'xl/styles.xml', data: enc.encode(styles)},
+  ];
+
+  var zipData = zipStore(zipFiles);
+  var blob = new Blob([zipData], {type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = '地质灾害调查表_' + new Date().toISOString().slice(0,10) + '.xlsx';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ============ PWA 安装 ============
+var deferredPrompt;
+window.addEventListener('beforeinstallprompt', function(e) {
+  e.preventDefault();
+  deferredPrompt = e;
+  document.getElementById('install-bar').classList.add('show');
+  document.getElementById('btn-install').style.display = '';
+});
+
+document.getElementById('btn-install').addEventListener('click', function() {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  deferredPrompt.userChoice.then(function(result) {
+    if (result.outcome === 'accepted') {
+      document.getElementById('install-bar').classList.remove('show');
+    }
+    deferredPrompt = null;
+  });
+});
+
+// ============ 自动保存（表单页离开时）============
+window.addEventListener('pagehide', function() {
+  if (currentSiteId) saveForm(true);
+});
+
+// ============ 键盘 ============
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && document.getElementById('modal-new').classList.contains('active')) {
+    confirmAddSite();
+  }
+});
+
+// ============ 启动 ============
+renderSiteList();
+</script>
+</body>
+</html>
