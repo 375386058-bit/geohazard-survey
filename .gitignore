@@ -1,0 +1,5 @@
+# 合并生成的临时文件
+*_合并.xlsx
+# Python
+__pycache__/
+*.pyc
