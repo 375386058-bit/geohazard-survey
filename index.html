@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>地质灾害调查表</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -77,8 +76,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
 .import-status.warn{display:block;background:#fef3c7;color:#92400e}
 .sync-bar{display:flex;align-items:center;gap:6px;padding:6px 10px;background:var(--accent-light);border-radius:6px;margin-bottom:12px;font-size:12px;color:var(--accent)}
 .sync-bar.offline{background:#fef2f2;color:var(--danger)}
-.sync-dot{width:6px;height:6px;border-radius:50%;background:var(--accent)}
-.sync-bar.offline .sync-dot{background:var(--danger)}
+.sync-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:pulse 2s infinite}
+.sync-bar.offline .sync-dot{background:var(--danger);animation:none}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 </style>
 </head>
 <body>
@@ -98,7 +98,6 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
     <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 12h6m-3-3v6m-7 4h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2z"/></svg>
     <p>暂无调查点</p>
     <button class="btn btn-primary btn-sm" onclick="addSite()">＋ 新建调查点</button>
-    <p style="margin-top:12px;font-size:12px;color:#999">其他人打开此链接时数据自动同步</p>
   </div>
   <div class="card-list" id="site-list"></div>
 </div>
@@ -115,7 +114,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
   <div id="form-sections"></div>
   <div class="toolbar">
     <button class="btn" onclick="goHome()">返回列表</button>
-    <button class="btn btn-primary" onclick="saveForm()">💾 保存</button>
+    <button class="btn btn-primary" onclick="saveForm()">💾 保存并同步</button>
   </div>
 </div>
 
@@ -123,7 +122,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
 <div class="modal-overlay" id="modal-new">
   <div class="modal">
     <h3>新建调查点</h3>
-    <input class="text-input" id="input-site-name" placeholder="输入地点名称（如：王家村滑坡点）" autocomplete="off">
+    <input class="text-input" id="input-site-name" placeholder="输入地点名称" autocomplete="off">
     <div class="modal-actions">
       <button class="btn" onclick="closeNewModal()">取消</button>
       <button class="btn btn-primary" onclick="confirmAddSite()">确定</button>
@@ -135,7 +134,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
 <div class="modal-overlay" id="modal-import">
   <div class="modal">
     <h3>导入数据</h3>
-    <p style="font-size:12px;color:var(--text-secondary);margin-bottom:10px">粘贴从其他手机导出的 JSON 数据，自动跳过重复。</p>
+    <p style="font-size:12px;color:var(--text-secondary);margin-bottom:10px">粘贴从其他手机导出的 JSON，自动跳过重复。</p>
     <div class="import-status" id="import-status"></div>
     <textarea class="text-input" id="input-import-json" placeholder="在此粘贴 JSON 数据..."></textarea>
     <div class="modal-actions">
@@ -145,96 +144,16 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
   </div>
 </div>
 
-<!-- 设置弹窗（首次配置） -->
-<div class="modal-overlay" id="modal-setup">
-  <div class="modal">
-    <h3>首次配置</h3>
-    <p style="font-size:12px;color:var(--text-secondary);margin-bottom:10px">请输入 Supabase 连接信息（只需配置一次）</p>
-    <input class="text-input" id="input-supabase-url" placeholder="Supabase URL（如 https://xxx.supabase.co）" autocomplete="off">
-    <input class="text-input" id="input-supabase-key" placeholder="Supabase Anon Key" autocomplete="off">
-    <div class="modal-actions">
-      <button class="btn btn-primary" onclick="saveSetup()">连接</button>
-    </div>
-  </div>
-</div>
-
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
 <script>
-// ==================== Supabase 配置 ====================
-var SUPABASE_URL = '';
-var SUPABASE_KEY = '';
-var supabase = null;
-var supabaseReady = false;
-
-function initSupabase() {
-  var saved = localStorage.getItem('geohazard_supabase_config');
-  if (saved) {
-    try {
-      var cfg = JSON.parse(saved);
-      SUPABASE_URL = cfg.url;
-      SUPABASE_KEY = cfg.key;
-    } catch(e) {}
-  }
-  if (!SUPABASE_URL || !SUPABASE_KEY) {
-    document.getElementById('modal-setup').classList.add('active');
-    updateSyncStatus(false, '未配置');
-    return;
-  }
-  try {
-    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-    supabaseReady = true;
-    testConnection();
-  } catch(e) {
-    updateSyncStatus(false, '连接失败');
-  }
-}
-
-function saveSetup() {
-  var url = document.getElementById('input-supabase-url').value.trim();
-  var key = document.getElementById('input-supabase-key').value.trim();
-  if (!url || !key) { showToast('请填写完整'); return; }
-  SUPABASE_URL = url; SUPABASE_KEY = key;
-  localStorage.setItem('geohazard_supabase_config', JSON.stringify({url:url, key:key}));
-  supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-  supabaseReady = true;
-  document.getElementById('modal-setup').classList.remove('active');
-  testConnection();
-}
-
-async function testConnection() {
-  try {
-    var {error} = await supabase.from('sites').select('id', {count:'exact', head:true});
-    if (error) throw error;
-    updateSyncStatus(true, '已连接云端');
-    loadFromCloud();
-  } catch(e) {
-    console.error('Supabase error:', e);
-    updateSyncStatus(false, '离线模式');
-    loadLocalOnly();
-  }
-}
-
-function updateSyncStatus(online, text) {
-  var bar = document.getElementById('sync-bar');
-  var txt = document.getElementById('sync-text');
-  if (online) {
-    bar.className = 'sync-bar';
-  } else {
-    bar.className = 'sync-bar offline';
-  }
-  txt.textContent = text;
-}
-
 // ==================== 数据模型 ====================
 var FIELDS = [
   {id:1,name:'乡镇与野外编号',type:'text',key:'villageCode',placeholder:'请输入乡镇与野外编号'},
   {id:2,name:'确定类型',type:'checkbox',key:'disasterType',options:['崩塌','滑坡（灾害点）','孕灾点','解译点']},
   {id:3,name:'总体地貌与微地貌',type:'double_checkbox',keys:['landformMacro','landformMicro'],
-    groups:[
-      {label:'总体地貌',key:'landformMacro',options:['平原','丘陵','低山','中山']},
-      {label:'微地貌',key:'landformMicro',options:['陡崖','陡坡','缓坡','平台']}]},
+    groups:[{label:'总体地貌',key:'landformMacro',options:['平原','丘陵','低山','中山']},{label:'微地貌',key:'landformMicro',options:['陡崖','陡坡','缓坡','平台']}]},
   {id:4,name:'岩体结构',type:'checkbox',key:'rockStructure',options:['整体块状结构','层状结构','碎裂结构','散体结构']},
   {id:5,name:'斜坡结构',type:'checkbox',key:'slopeStructure',options:['土质','岩质','土石混合']},
   {id:6,name:'斜坡类型（石质斜坡填写）',type:'checkbox',key:'slopeType',options:['顺向坡','切向坡','横向坡','逆向坡','近水平层斜坡','块状岩体斜坡']},
@@ -271,30 +190,43 @@ function defaultFormData() {
     rockBlockL:'',rockBlockW:'',rockBlockH:'',
     fissureGroups:'',fissureLength:'',fissureWidth:'',fissureDensity:'',
     debrisShape:[],debrisVolumeL:'',debrisVolumeW:'',debrisVolumeH:'',
-    humanActivity:[],humanActivityOther:'',
-    surfaceWater:[],surfaceWaterOther:'',
-    vegetationType:[],vegetationCoverage:'',
-    damageSigns:[],threatPeople:'',threatProperty:'',
-    disasterPointType:[],extraNotes:'',observationNotes:''
+    humanActivity:[],humanActivityOther:'',surfaceWater:[],surfaceWaterOther:'',
+    vegetationType:[],vegetationCoverage:'',damageSigns:[],
+    threatPeople:'',threatProperty:'',disasterPointType:[],
+    extraNotes:'',observationNotes:''
   };
 }
 
-// ==================== 云端数据层 ====================
+// ==================== 云端 API ====================
+var API_BASE = '/api/sites';
 var sitesCache = [];
+var apiOnline = false;
+
+async function apiFetch(method, body) {
+  var opts = {method:method, headers:{'Content-Type':'application/json'}};
+  var url = API_BASE;
+  if (method==='DELETE' && body && body.id) url += '?id=' + encodeURIComponent(body.id);
+  else if (body) opts.body = JSON.stringify(body);
+  try {
+    var res = await fetch(url, opts);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return await res.json();
+  } catch(e) {
+    apiOnline = false;
+    throw e;
+  }
+}
 
 async function loadFromCloud() {
   try {
-    var {data, error} = await supabase.from('sites').select('*').order('updated_at', {ascending:false});
-    if (error) throw error;
-    sitesCache = (data || []).map(function(r) {
-      return {id:r.id, name:r.name, data:r.data||defaultFormData(), createdAt:new Date(r.created_at).getTime(), updatedAt:new Date(r.updated_at).getTime()};
-    });
-    // Merge with localStorage
+    var data = await apiFetch('GET');
+    sitesCache = data || [];
     localStorage.setItem('geohazard_sites', JSON.stringify(sitesCache));
+    apiOnline = true;
+    updateSyncStatus(true, '云端同步 ('+sitesCache.length+'个点)');
     renderSiteList();
-    updateSyncStatus(true, '云端同步('+sitesCache.length+'个点)');
   } catch(e) {
-    console.error('Cloud load error:', e);
+    console.error('Load error:', e);
     loadLocalOnly();
   }
 }
@@ -302,31 +234,30 @@ async function loadFromCloud() {
 function loadLocalOnly() {
   try { sitesCache = JSON.parse(localStorage.getItem('geohazard_sites')) || []; } catch(e) { sitesCache = []; }
   renderSiteList();
-  updateSyncStatus(false, '离线('+sitesCache.length+'个点)');
+  updateSyncStatus(false, '离线 ('+sitesCache.length+'个点)');
 }
 
 async function cloudUpsert(site) {
-  if (!supabaseReady) return;
   try {
-    var {error} = await supabase.from('sites').upsert({
-      id: site.id,
-      name: site.name,
-      data: site.data,
-      updated_at: new Date(site.updatedAt).toISOString()
-    });
-    if (error) console.error('Cloud upsert error:', error);
-  } catch(e) { console.error('Cloud upsert error:', e); }
+    await apiFetch('POST', {id:site.id, name:site.name, data:site.data});
+    apiOnline = true;
+  } catch(e) { console.error('Upsert error:', e); }
 }
 
 async function cloudDelete(id) {
-  if (!supabaseReady) return;
   try {
-    var {error} = await supabase.from('sites').delete().eq('id', id);
-    if (error) console.error('Cloud delete error:', error);
-  } catch(e) { console.error('Cloud delete error:', e); }
+    await apiFetch('DELETE', {id:id});
+    apiOnline = true;
+  } catch(e) { console.error('Delete error:', e); }
 }
 
-// ==================== UI 工具 ====================
+function updateSyncStatus(online, text) {
+  var bar = document.getElementById('sync-bar'), txt = document.getElementById('sync-text');
+  bar.className = 'sync-bar' + (online ? '' : ' offline');
+  txt.textContent = text;
+}
+
+// ==================== 工具 ====================
 var toastTimer;
 function showToast(msg) {
   var el = document.getElementById('toast');
@@ -334,77 +265,41 @@ function showToast(msg) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(function(){ el.classList.remove('show'); }, 1800);
 }
-
 function escHtml(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 function escAttr(s) { return (s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
 
 function countFilledFields(data) {
-  var count = 0;
-  if (data.villageCode) count++;
-  if (data.disasterType.length) count++;
-  if (data.landformMacro.length||data.landformMicro.length) count++;
-  if (data.rockStructure.length) count++;
-  if (data.slopeStructure.length) count++;
-  if (data.slopeType.length) count++;
-  if (data.slopeShape.length) count++;
-  if (data.stratumDip||data.stratumDipAngle) count++;
-  if (data.fissure1Dip||data.fissure1DipAngle) count++;
-  if (data.fissure2Dip||data.fissure2DipAngle) count++;
-  if (data.rockBlockL||data.rockBlockW||data.rockBlockH) count++;
-  if (data.fissureGroups||data.fissureLength) count++;
-  if (data.debrisShape.length||data.debrisVolumeL) count++;
-  if (data.humanActivity.length||data.humanActivityOther) count++;
-  if (data.surfaceWater.length||data.surfaceWaterOther) count++;
-  if (data.vegetationType.length||data.vegetationCoverage) count++;
-  if (data.damageSigns.length) count++;
-  if (data.threatPeople||data.threatProperty) count++;
-  if (data.disasterPointType.length) count++;
-  return count;
+  var n=0;
+  if(data.villageCode)n++; if(data.disasterType.length)n++; if(data.landformMacro.length||data.landformMicro.length)n++;
+  if(data.rockStructure.length)n++; if(data.slopeStructure.length)n++; if(data.slopeType.length)n++; if(data.slopeShape.length)n++;
+  if(data.stratumDip||data.stratumDipAngle)n++; if(data.fissure1Dip||data.fissure1DipAngle)n++; if(data.fissure2Dip||data.fissure2DipAngle)n++;
+  if(data.rockBlockL||data.rockBlockW||data.rockBlockH)n++; if(data.fissureGroups||data.fissureLength)n++;
+  if(data.debrisShape.length||data.debrisVolumeL)n++; if(data.humanActivity.length||data.humanActivityOther)n++;
+  if(data.surfaceWater.length||data.surfaceWaterOther)n++; if(data.vegetationType.length||data.vegetationCoverage)n++;
+  if(data.damageSigns.length)n++; if(data.threatPeople||data.threatProperty)n++; if(data.disasterPointType.length)n++;
+  return n;
 }
 
 // ==================== 首页 ====================
 var currentSiteId = null;
 
 function renderSiteList() {
-  var listEl = document.getElementById('site-list');
-  var emptyEl = document.getElementById('empty-state');
-  if (sitesCache.length === 0) {
-    listEl.innerHTML = '';
-    emptyEl.style.display = 'block';
-    return;
-  }
-  emptyEl.style.display = 'none';
-  listEl.innerHTML = sitesCache.map(function(s) {
-    var updated = s.updatedAt ? new Date(s.updatedAt).toLocaleString('zh-CN') : '未填写';
-    var filled = countFilledFields(s.data);
-    return '<div class="card" onclick="openSite(\'' + s.id + '\')">' +
-      '<div class="card-info">' +
-        '<div class="card-title">' + escHtml(s.name || '未命名') + '</div>' +
-        '<div class="card-meta">' +
-          '<span>' + (s.data && s.data.villageCode ? escHtml(s.data.villageCode) : '暂无编号') + '</span>' +
-          '<span>已完成 ' + filled + '/19 项</span>' +
-          '<span>' + updated + '</span>' +
-        '</div>' +
-      '</div>' +
-      '<div class="card-actions" onclick="event.stopPropagation()">' +
-        '<button class="btn btn-sm btn-icon" onclick="exportSingleJson(\'' + s.id + '\')">📤</button>' +
-        '<button class="btn btn-sm btn-icon" onclick="exportSingle(\'' + s.id + '\')">📥</button>' +
-        '<button class="btn btn-sm btn-icon btn-danger" onclick="deleteSite(\'' + s.id + '\')">✕</button>' +
-      '</div>' +
-    '</div>';
+  var listEl = document.getElementById('site-list'), emptyEl = document.getElementById('empty-state');
+  if (sitesCache.length===0) { listEl.innerHTML=''; emptyEl.style.display='block'; return; }
+  emptyEl.style.display='none';
+  listEl.innerHTML = sitesCache.map(function(s){
+    var t = s.updatedAt ? new Date(s.updatedAt).toLocaleString('zh-CN') : '未填写';
+    var f = countFilledFields(s.data);
+    return '<div class="card" onclick="openSite(\''+s.id+'\')"><div class="card-info"><div class="card-title">'+escHtml(s.name||'未命名')+'</div><div class="card-meta"><span>'+(s.data&&s.data.villageCode?escHtml(s.data.villageCode):'暂无编号')+'</span><span>已完成 '+f+'/19 项</span><span>'+t+'</span></div></div><div class="card-actions" onclick="event.stopPropagation()"><button class="btn btn-sm btn-icon" onclick="exportSingleJson(\''+s.id+'\')">📤</button><button class="btn btn-sm btn-icon" onclick="exportSingle(\''+s.id+'\')">📥</button><button class="btn btn-sm btn-icon btn-danger" onclick="deleteSite(\''+s.id+'\')">✕</button></div></div>';
   }).join('');
 }
 
-function addSite() {
-  document.getElementById('modal-new').classList.add('active');
-  document.getElementById('input-site-name').value = '';
-  document.getElementById('input-site-name').focus();
-}
+function addSite() { document.getElementById('modal-new').classList.add('active'); document.getElementById('input-site-name').value=''; document.getElementById('input-site-name').focus(); }
 function closeNewModal() { document.getElementById('modal-new').classList.remove('active'); }
 
-function confirmAddSite() {
+async function confirmAddSite() {
   var name = document.getElementById('input-site-name').value.trim();
-  if (!name) { showToast('请输入地点名称'); return; }
+  if(!name) { showToast('请输入地点名称'); return; }
   var site = {id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),name:name,data:defaultFormData(),createdAt:Date.now(),updatedAt:Date.now()};
   sitesCache.unshift(site);
   localStorage.setItem('geohazard_sites', JSON.stringify(sitesCache));
@@ -413,12 +308,12 @@ function confirmAddSite() {
 }
 
 async function deleteSite(id) {
-  if (!confirm('确定删除此调查点吗？')) return;
+  if(!confirm('确定删除？')) return;
   sitesCache = sitesCache.filter(function(s){return s.id!==id;});
   localStorage.setItem('geohazard_sites', JSON.stringify(sitesCache));
   await cloudDelete(id);
   renderSiteList();
-  if (currentSiteId===id) goHome();
+  if(currentSiteId===id) goHome();
   showToast('已删除');
 }
 
@@ -426,7 +321,7 @@ async function deleteSite(id) {
 function openSite(id) {
   currentSiteId = id;
   var site = sitesCache.find(function(s){return s.id===id;});
-  if (!site) { showToast('数据不存在'); return; }
+  if(!site) { showToast('数据不存在'); return; }
   document.getElementById('page-list').classList.remove('active');
   document.getElementById('page-form').classList.add('active');
   document.getElementById('form-title').textContent = site.name;
@@ -438,8 +333,7 @@ function goHome() {
   saveForm(true); currentSiteId = null;
   document.getElementById('page-form').classList.remove('active');
   document.getElementById('page-list').classList.add('active');
-  if (supabaseReady) loadFromCloud(); else renderSiteList();
-  window.scrollTo(0,0);
+  loadFromCloud(); window.scrollTo(0,0);
 }
 
 // ==================== 表单构建 ====================
@@ -450,165 +344,105 @@ function buildForm(data) {
   document.getElementById('form-sections').innerHTML = html;
   document.querySelectorAll('.section-header').forEach(function(h){h.addEventListener('click',function(){this.parentElement.classList.toggle('open');});});
   document.querySelectorAll('.chip').forEach(function(c){c.addEventListener('click',function(e){if(e.target.tagName==='INPUT')return;this.classList.toggle('checked');});});
-  var first = document.querySelector('.section'); if (first) first.classList.add('open');
+  var first=document.querySelector('.section'); if(first) first.classList.add('open');
 }
 
-function buildField(f, data) {
-  var body = '';
+function buildField(f,data) {
+  var body='';
   switch(f.type) {
-    case 'text':
-      body = '<div class="field-group"><input class="text-input" data-key="'+f.key+'" value="'+escAttr(data[f.key]||'')+'" placeholder="'+(f.placeholder||'')+'"></div>'; break;
-    case 'checkbox':
-      body = '<div class="field-group"><div class="checkbox-grid">'+f.options.map(function(o){var c=(data[f.key]||[]).indexOf(o)>=0;return '<div class="chip'+(c?' checked':'')+'" data-key="'+f.key+'" data-val="'+escAttr(o)+'">'+o+'</div>';}).join('')+'</div></div>'; break;
-    case 'double_checkbox':
-      body = f.groups.map(function(g){return '<div class="field-group"><div class="field-label">'+g.label+'</div><div class="checkbox-grid">'+g.options.map(function(o){var c=(data[g.key]||[]).indexOf(o)>=0;return '<div class="chip'+(c?' checked':'')+'" data-key="'+g.key+'" data-val="'+escAttr(o)+'">'+o+'</div>';}).join('')+'</div></div>';}).join(''); break;
-    case 'measure_triple':
-      body = '<div class="field-group"><div class="inline-inputs">'+f.measures.map(function(m){return '<span>'+m.label+'</span><input class="text-input" data-key="'+m.key+'" value="'+escAttr(data[m.key]||'')+'" style="width:60px"><span>'+m.unit+'</span>';}).join('')+'</div></div>'; break;
-    case 'triple_input':
-      body = '<div class="field-group"><div class="inline-inputs">'+f.units.map(function(u,i){return '<span>'+u+'</span><input class="text-input" data-key="'+f.keys[i]+'" value="'+escAttr(data[f.keys[i]]||'')+'" placeholder="m" style="width:60px">';}).join('')+'</div></div>'; break;
-    case 'mixed_checkbox_triple':
-      body = '<div class="field-group"><div class="field-label">形状</div><div class="checkbox-grid">'+f.checkboxOptions.map(function(o){var c=(data[f.checkboxKey]||[]).indexOf(o)>=0;return '<div class="chip'+(c?' checked':'')+'" data-key="'+f.checkboxKey+'" data-val="'+escAttr(o)+'">'+o+'</div>';}).join('')+'</div></div><div class="field-group"><div class="field-label">体积（长×宽×高）</div><div class="inline-inputs">'+f.tripleUnits.map(function(u,i){return '<span>'+u+'</span><input class="text-input" data-key="'+f.tripleKeys[i]+'" value="'+escAttr(data[f.tripleKeys[i]]||'')+'" placeholder="m" style="width:60px">';}).join('')+'</div></div>'; break;
-    case 'checkbox_other':
-      body = '<div class="field-group"><div class="checkbox-grid">'+f.options.map(function(o){var c=(data[f.key]||[]).indexOf(o)>=0;return '<div class="chip'+(c?' checked':'')+'" data-key="'+f.key+'" data-val="'+escAttr(o)+'">'+o+'</div>';}).join('')+'<div class="chip chip-other"><span>其他</span><input data-key="'+f.otherKey+'" value="'+escAttr(data[f.otherKey]||'')+'" placeholder="请填写"></div></div></div>'; break;
-    case 'checkbox_number':
-      body = '<div class="field-group"><div class="checkbox-grid">'+f.options.map(function(o){var c=(data[f.key]||[]).indexOf(o)>=0;return '<div class="chip'+(c?' checked':'')+'" data-key="'+f.key+'" data-val="'+escAttr(o)+'">'+o+'</div>';}).join('')+'</div></div><div class="field-group"><div class="field-label">'+(f.numberPlaceholder||'覆盖率')+'</div><div class="inline-inputs"><input class="text-input" data-key="'+f.numberKey+'" value="'+escAttr(data[f.numberKey]||'')+'" style="width:80px"><span>'+(f.numberUnit||'')+'</span></div></div>'; break;
-    case 'dual_number':
-      body = '<div class="field-group"><div class="inline-inputs">'+f.labels.map(function(l,i){return '<span>'+l+'</span><input class="text-input" data-key="'+f.keys[i]+'" value="'+escAttr(data[f.keys[i]]||'')+'" style="width:80px"><span>'+f.units[i]+'</span>';}).join('')+'</div></div>'; break;
+    case'text':body='<div class="field-group"><input class="text-input" data-key="'+f.key+'" value="'+escAttr(data[f.key]||'')+'" placeholder="'+(f.placeholder||'')+'"></div>';break;
+    case'checkbox':body='<div class="field-group"><div class="checkbox-grid">'+f.options.map(function(o){var c=(data[f.key]||[]).indexOf(o)>=0;return'<div class="chip'+(c?' checked':'')+'" data-key="'+f.key+'" data-val="'+escAttr(o)+'">'+o+'</div>';}).join('')+'</div></div>';break;
+    case'double_checkbox':body=f.groups.map(function(g){return'<div class="field-group"><div class="field-label">'+g.label+'</div><div class="checkbox-grid">'+g.options.map(function(o){var c=(data[g.key]||[]).indexOf(o)>=0;return'<div class="chip'+(c?' checked':'')+'" data-key="'+g.key+'" data-val="'+escAttr(o)+'">'+o+'</div>';}).join('')+'</div></div>';}).join('');break;
+    case'measure_triple':body='<div class="field-group"><div class="inline-inputs">'+f.measures.map(function(m){return'<span>'+m.label+'</span><input class="text-input" data-key="'+m.key+'" value="'+escAttr(data[m.key]||'')+'" style="width:60px"><span>'+m.unit+'</span>';}).join('')+'</div></div>';break;
+    case'triple_input':body='<div class="field-group"><div class="inline-inputs">'+f.units.map(function(u,i){return'<span>'+u+'</span><input class="text-input" data-key="'+f.keys[i]+'" value="'+escAttr(data[f.keys[i]]||'')+'" placeholder="m" style="width:60px">';}).join('')+'</div></div>';break;
+    case'mixed_checkbox_triple':body='<div class="field-group"><div class="field-label">形状</div><div class="checkbox-grid">'+f.checkboxOptions.map(function(o){var c=(data[f.checkboxKey]||[]).indexOf(o)>=0;return'<div class="chip'+(c?' checked':'')+'" data-key="'+f.checkboxKey+'" data-val="'+escAttr(o)+'">'+o+'</div>';}).join('')+'</div></div><div class="field-group"><div class="field-label">体积（长×宽×高）</div><div class="inline-inputs">'+f.tripleUnits.map(function(u,i){return'<span>'+u+'</span><input class="text-input" data-key="'+f.tripleKeys[i]+'" value="'+escAttr(data[f.tripleKeys[i]]||'')+'" placeholder="m" style="width:60px">';}).join('')+'</div></div>';break;
+    case'checkbox_other':body='<div class="field-group"><div class="checkbox-grid">'+f.options.map(function(o){var c=(data[f.key]||[]).indexOf(o)>=0;return'<div class="chip'+(c?' checked':'')+'" data-key="'+f.key+'" data-val="'+escAttr(o)+'">'+o+'</div>';}).join('')+'<div class="chip chip-other"><span>其他</span><input data-key="'+f.otherKey+'" value="'+escAttr(data[f.otherKey]||'')+'" placeholder="请填写"></div></div></div>';break;
+    case'checkbox_number':body='<div class="field-group"><div class="checkbox-grid">'+f.options.map(function(o){var c=(data[f.key]||[]).indexOf(o)>=0;return'<div class="chip'+(c?' checked':'')+'" data-key="'+f.key+'" data-val="'+escAttr(o)+'">'+o+'</div>';}).join('')+'</div></div><div class="field-group"><div class="field-label">'+(f.numberPlaceholder||'覆盖率')+'</div><div class="inline-inputs"><input class="text-input" data-key="'+f.numberKey+'" value="'+escAttr(data[f.numberKey]||'')+'" style="width:80px"><span>'+(f.numberUnit||'')+'</span></div></div>';break;
+    case'dual_number':body='<div class="field-group"><div class="inline-inputs">'+f.labels.map(function(l,i){return'<span>'+l+'</span><input class="text-input" data-key="'+f.keys[i]+'" value="'+escAttr(data[f.keys[i]]||'')+'" style="width:80px"><span>'+f.units[i]+'</span>';}).join('')+'</div></div>';break;
   }
-  return '<div class="section"><div class="section-header"><div style="display:flex;align-items:center;flex:1;min-width:0"><span class="section-number">'+f.id+'</span><span class="section-title">'+f.name+'</span></div><span class="section-arrow">▼</span></div><div class="section-body">'+body+'</div></div>';
+  return'<div class="section"><div class="section-header"><div style="display:flex;align-items:center;flex:1;min-width:0"><span class="section-number">'+f.id+'</span><span class="section-title">'+f.name+'</span></div><span class="section-arrow">▼</span></div><div class="section-body">'+body+'</div></div>';
 }
 
-function buildExtraField(f, data) {
-  return '<div class="section"><div class="section-header"><div style="display:flex;align-items:center;flex:1;min-width:0"><span class="section-number">'+f.id+'</span><span class="section-title">'+f.name+'</span></div><span class="section-arrow">▼</span></div><div class="section-body"><div class="field-group"><textarea class="text-input textarea" data-key="'+f.key+'" placeholder="'+(f.placeholder||'')+'">'+escHtml(data[f.key]||'')+'</textarea></div></div></div>';
+function buildExtraField(f,data) {
+  return'<div class="section"><div class="section-header"><div style="display:flex;align-items:center;flex:1;min-width:0"><span class="section-number">'+f.id+'</span><span class="section-title">'+f.name+'</span></div><span class="section-arrow">▼</span></div><div class="section-body"><div class="field-group"><textarea class="text-input textarea" data-key="'+f.key+'" placeholder="'+(f.placeholder||'')+'">'+escHtml(data[f.key]||'')+'</textarea></div></div></div>';
 }
 
 // ==================== 表单读写 ====================
 function readFormData() {
   var data = defaultFormData();
   document.querySelectorAll('#form-sections [data-key]').forEach(function(el){
-    var key = el.getAttribute('data-key');
-    if (el.tagName==='TEXTAREA') data[key]=el.value;
-    else if (el.type==='text' || el.tagName==='INPUT') data[key]=el.value;
+    var key=el.getAttribute('data-key');
+    if(el.tagName==='TEXTAREA') data[key]=el.value;
+    else if(el.type==='text'||el.tagName==='INPUT') data[key]=el.value;
   });
-  var chipMap = {};
+  var chipMap={};
   document.querySelectorAll('#form-sections .chip.checked').forEach(function(c){
-    var key = c.getAttribute('data-key'), val = c.getAttribute('data-val');
-    if (!key||!val) return;
-    if (!chipMap[key]) chipMap[key] = [];
-    if (chipMap[key].indexOf(val)<0) chipMap[key].push(val);
+    var key=c.getAttribute('data-key'),val=c.getAttribute('data-val');
+    if(!key||!val)return; if(!chipMap[key])chipMap[key]=[];
+    if(chipMap[key].indexOf(val)<0) chipMap[key].push(val);
   });
   document.querySelectorAll('#form-sections .chip-other input').forEach(function(el){
-    var key = el.getAttribute('data-key');
-    if (key && el.value.trim()) { if(!chipMap[key])chipMap[key]=[]; chipMap[key].push(el.value.trim()); }
+    var key=el.getAttribute('data-key');
+    if(key&&el.value.trim()){ if(!chipMap[key])chipMap[key]=[]; chipMap[key].push(el.value.trim()); }
   });
   Object.keys(chipMap).forEach(function(k){data[k]=chipMap[k];});
   return data;
 }
 
 function saveForm(silent) {
-  if (!currentSiteId) return;
-  var idx = sitesCache.findIndex(function(s){return s.id===currentSiteId;});
-  if (idx<0) return;
-  sitesCache[idx].data = readFormData();
-  sitesCache[idx].updatedAt = Date.now();
+  if(!currentSiteId) return;
+  var idx=sitesCache.findIndex(function(s){return s.id===currentSiteId;});
+  if(idx<0) return;
+  sitesCache[idx].data=readFormData(); sitesCache[idx].updatedAt=Date.now();
   localStorage.setItem('geohazard_sites', JSON.stringify(sitesCache));
   cloudUpsert(sitesCache[idx]);
-  document.getElementById('form-meta').textContent = '创建：'+new Date(sitesCache[idx].createdAt).toLocaleString('zh-CN')+' | 更新：'+new Date(sitesCache[idx].updatedAt).toLocaleString('zh-CN');
-  if (!silent) showToast('已保存并同步');
+  document.getElementById('form-meta').textContent='创建：'+new Date(sitesCache[idx].createdAt).toLocaleString('zh-CN')+' | 更新：'+new Date(sitesCache[idx].updatedAt).toLocaleString('zh-CN');
+  if(!silent) showToast('已保存并同步');
 }
 
 // ==================== JSON 导出/导入 ====================
-function exportSiteJson() {
-  if (!currentSiteId) return;
-  saveForm(true);
-  var site = sitesCache.find(function(s){return s.id===currentSiteId;});
-  if (!site) return;
-  copyOrDownload([site]);
-}
-function exportSingleJson(id) {
-  var site = sitesCache.find(function(s){return s.id===id;});
-  if (!site) return;
-  copyOrDownload([site]);
-}
-function exportAllJson() {
-  if (sitesCache.length===0) { showToast('暂无数据'); return; }
-  copyOrDownload(sitesCache);
-}
-
+function exportSiteJson() { if(!currentSiteId)return; saveForm(true); var s=sitesCache.find(function(x){return x.id===currentSiteId;}); if(s)copyOrDownload([s]); }
+function exportSingleJson(id) { var s=sitesCache.find(function(x){return x.id===id;}); if(s)copyOrDownload([s]); }
+function exportAllJson() { if(sitesCache.length===0){showToast('暂无数据');return;} copyOrDownload(sitesCache); }
 function copyOrDownload(sites) {
-  var text = JSON.stringify(sites, null, 2);
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(text).then(function(){
-      showToast('已复制到剪贴板');
-    }).catch(function(){ downloadJson(text); });
-  } else { downloadJson(text); }
+  var text=JSON.stringify(sites,null,2);
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(function(){showToast('已复制到剪贴板');}).catch(function(){downloadJson(text);});}
+  else{downloadJson(text);}
 }
-
-function downloadJson(text) {
-  var blob = new Blob([text], {type:'application/json'});
-  var url = URL.createObjectURL(blob);
-  var a = document.createElement('a');
-  a.href = url; a.download = '地灾调查数据_'+new Date().toISOString().slice(0,10)+'.json';
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  URL.revokeObjectURL(url); showToast('已下载 JSON 文件');
+function downloadJson(text){
+  var blob=new Blob([text],{type:'application/json'}); var url=URL.createObjectURL(blob); var a=document.createElement('a');
+  a.href=url; a.download='地灾调查数据_'+new Date().toISOString().slice(0,10)+'.json';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); showToast('已下载');
 }
-
-function showImportModal() {
-  document.getElementById('modal-import').classList.add('active');
-  document.getElementById('input-import-json').value = '';
-  document.getElementById('import-status').className = 'import-status';
-  document.getElementById('import-status').textContent = '';
-  document.getElementById('input-import-json').focus();
-}
-function closeImportModal() { document.getElementById('modal-import').classList.remove('active'); }
-
-async function confirmImport() {
-  var raw = document.getElementById('input-import-json').value.trim();
-  if (!raw) { showToast('请粘贴数据'); return; }
-  var imported, statusEl = document.getElementById('import-status');
-  try { imported = JSON.parse(raw); } catch(e) {
-    statusEl.className = 'import-status warn';
-    statusEl.textContent = 'JSON 格式错误';
-    return;
+function showImportModal(){document.getElementById('modal-import').classList.add('active');document.getElementById('input-import-json').value='';document.getElementById('import-status').className='import-status';document.getElementById('input-import-json').focus();}
+function closeImportModal(){document.getElementById('modal-import').classList.remove('active');}
+async function confirmImport(){
+  var raw=document.getElementById('input-import-json').value.trim();
+  if(!raw){showToast('请粘贴数据');return;}
+  var imported,statusEl=document.getElementById('import-status');
+  try{imported=JSON.parse(raw);}catch(e){statusEl.className='import-status warn';statusEl.textContent='JSON 格式错误';return;}
+  if(!Array.isArray(imported))imported=[imported];
+  var added=0,skipped=0;
+  for(var i=0;i<imported.length;i++){
+    var item=imported[i];if(!item.name||!item.data)continue;
+    var exists=sitesCache.find(function(s){return s.name===item.name;});
+    if(exists){skipped++;continue;}
+    var site={id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),name:item.name,data:item.data,createdAt:item.createdAt||Date.now(),updatedAt:item.updatedAt||Date.now()};
+    sitesCache.push(site); await cloudUpsert(site); added++;
   }
-  if (!Array.isArray(imported)) imported = [imported];
-  var added = 0, skipped = 0;
-  for (var i = 0; i < imported.length; i++) {
-    var item = imported[i];
-    if (!item.name || !item.data) continue;
-    var exists = sitesCache.find(function(s){return s.name===item.name;});
-    if (exists) { skipped++; continue; }
-    var site = {id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),name:item.name,data:item.data,createdAt:item.createdAt||Date.now(),updatedAt:item.updatedAt||Date.now()};
-    sitesCache.push(site);
-    await cloudUpsert(site);
-    added++;
-  }
-  localStorage.setItem('geohazard_sites', JSON.stringify(sitesCache));
-  statusEl.className = 'import-status ok';
-  statusEl.textContent = '导入成功：新增 '+added+' 个，跳过 '+skipped+' 个（重复）';
-  renderSiteList();
-  setTimeout(closeImportModal, 1200);
+  localStorage.setItem('geohazard_sites',JSON.stringify(sitesCache));
+  statusEl.className='import-status ok'; statusEl.textContent='导入成功：新增 '+added+' 个，跳过 '+skipped+' 个（重复）';
+  renderSiteList(); setTimeout(closeImportModal,1200);
 }
 
 // ==================== Excel 导出 ====================
-function exportSingle(id) {
-  var site = sitesCache.find(function(s){return s.id===id;});
-  if(!site)return; generateExcel([site]); showToast('Excel 已下载');
-}
-function exportAll() {
-  if(sitesCache.length===0){showToast('暂无数据');return;}
-  generateExcel(sitesCache); showToast('Excel 已下载');
-}
-function exportSite() {
-  if(!currentSiteId)return; saveForm(true); exportSingle(currentSiteId);
-}
-
-function generateExcel(sites) {
-  var rows = [['序号','项目名称','选项内容']];
-  sites.forEach(function(site){
-    var d=site.data||{};
-    rows.push(['','调查点：'+site.name,'']);
-    rows.push(['','更新时间：'+new Date(site.updatedAt).toLocaleString('zh-CN'),'']);
+function exportSingle(id){var s=sitesCache.find(function(x){return x.id===id;});if(s){generateExcel([s]);showToast('Excel 已下载');}}
+function exportAll(){if(sitesCache.length===0){showToast('暂无数据');return;}generateExcel(sitesCache);showToast('Excel 已下载');}
+function exportSite(){if(!currentSiteId)return;saveForm(true);exportSingle(currentSiteId);}
+function generateExcel(sites){
+  var rows=[['序号','项目名称','选项内容']];
+  sites.forEach(function(site){var d=site.data||{};
+    rows.push(['','调查点：'+site.name,''],['','更新时间：'+new Date(site.updatedAt).toLocaleString('zh-CN'),'']);
     rows.push([1,'乡镇与野外编号',d.villageCode||'']);
     rows.push([2,'确定类型：','□崩塌 □滑坡（灾害点） □孕灾点 □解译点']);
     if((d.disasterType||[]).length)rows.push(['','','【已选：'+d.disasterType.join('、')+'】']);
@@ -625,19 +459,14 @@ function generateExcel(sites) {
     rows.push([7,'坡面形态','□凹-凸型 □凸型 □阶梯型 □直型 □凹型']);
     if((d.slopeShape||[]).length)rows.push(['','','已选：'+d.slopeShape.join('、')]);
     rows.push([8,'岩层产状（倾向与倾角）',(d.stratumDip||'____')+'°<'+(d.stratumDipAngle||'____')+'°']);
-    rows.push(['','','长度：'+(d.stratumLength||'____')+' m']);
-    rows.push(['','','间距：'+(d.stratumSpacing||'____')+' m']);
+    rows.push(['','','长度：'+(d.stratumLength||'____')+' m'],['','','间距：'+(d.stratumSpacing||'____')+' m']);
     rows.push([9,'裂隙产状1（倾向与倾角）',(d.fissure1Dip||'____')+'°<'+(d.fissure1DipAngle||'____')+'°']);
-    rows.push(['','','长度：'+(d.fissure1Length||'____')+' m']);
-    rows.push(['','','间距：'+(d.fissure1Spacing||'____')+' m']);
+    rows.push(['','','长度：'+(d.fissure1Length||'____')+' m'],['','','间距：'+(d.fissure1Spacing||'____')+' m']);
     rows.push([10,'裂隙产状2（倾向与倾角）',(d.fissure2Dip||'____')+'°<'+(d.fissure2DipAngle||'____')+'°']);
-    rows.push(['','','长度：'+(d.fissure2Length||'____')+' m']);
-    rows.push(['','','间距：'+(d.fissure2Spacing||'____')+' m']);
+    rows.push(['','','长度：'+(d.fissure2Length||'____')+' m'],['','','间距：'+(d.fissure2Spacing||'____')+' m']);
     rows.push([11,'裂隙分割的岩石块度(长×宽×高)(m)',(d.rockBlockL||'____')+' × '+(d.rockBlockW||'____')+' × '+(d.rockBlockH||'____')]);
     rows.push([12,'岩体（土体）裂隙发育情况','裂隙组数：'+(d.fissureGroups||'____')+' 组']);
-    rows.push(['','','裂隙长 '+(d.fissureLength||'____')+' 米']);
-    rows.push(['','','宽 '+(d.fissureWidth||'____')+' 米']);
-    rows.push(['','','密度 '+(d.fissureDensity||'____')+' 条/米']);
+    rows.push(['','','裂隙长 '+(d.fissureLength||'____')+' 米'],['','','宽 '+(d.fissureWidth||'____')+' 米'],['','','密度 '+(d.fissureDensity||'____')+' 条/米']);
     rows.push([13,'有无下滑的堆积物、如有记录其形状和体积','形状：□扇形 □锥形 □其他']);
     if((d.debrisShape||[]).length)rows.push(['','','  已选：'+d.debrisShape.join('、')]);
     rows.push(['','','体积：(长×宽×高)(m) '+(d.debrisVolumeL||'____')+' × '+(d.debrisVolumeW||'____')+' × '+(d.debrisVolumeH||'____')]);
@@ -650,33 +479,23 @@ function generateExcel(sites) {
     rows.push(['','','覆盖率：'+(d.vegetationCoverage||'____')+' %']);
     rows.push([17,'有无树木歪斜、建筑裂缝、地面裂缝','□树木歪斜 □建筑裂缝 □地面裂缝']);
     if((d.damageSigns||[]).length)rows.push(['','','已选：'+d.damageSigns.join('、')]);
-    rows.push([18,'威胁人数（人）与威胁财产（万元）','威胁人数：'+(d.threatPeople||'____')+' 人']);
-    rows.push(['','','威胁财产：'+(d.threatProperty||'____')+' 万元']);
+    rows.push([18,'威胁人数（人）与威胁财产（万元）','威胁人数：'+(d.threatPeople||'____')+' 人'],['','','威胁财产：'+(d.threatProperty||'____')+' 万元']);
     rows.push([19,'孕灾点类型','□地质构造点 □工程地质岩组点 □崩滑易滑地层点 □其他点 □斜坡结构点']);
     if((d.disasterPointType||[]).length)rows.push(['','','已选：'+d.disasterPointType.join('、')]);
-    rows.push(['','变形破坏情况及其他补充内容：',d.extraNotes||'']);
-    rows.push(['','孕灾点沿途观测内容：',d.observationNotes||'']);
-    rows.push(['','','']);
+    rows.push(['','变形破坏情况及其他补充内容：',d.extraNotes||''],['','孕灾点沿途观测内容：',d.observationNotes||''],['','','']);
   });
-  var ws = XLSX.utils.aoa_to_sheet(rows);
-  ws['!cols'] = [{wch:6},{wch:32},{wch:60}];
-  var wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, '地质灾害调查表');
-  XLSX.writeFile(wb, '地质灾害调查表_'+new Date().toISOString().slice(0,10)+'.xlsx');
+  var ws=XLSX.utils.aoa_to_sheet(rows); ws['!cols']=[{wch:6},{wch:32},{wch:60}];
+  var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'地质灾害调查表');
+  XLSX.writeFile(wb,'地质灾害调查表_'+new Date().toISOString().slice(0,10)+'.xlsx');
 }
 
 // ==================== 键盘 ====================
-document.addEventListener('keydown', function(e) {
-  if (e.key === 'Enter' && document.getElementById('modal-new').classList.contains('active')) confirmAddSite();
-});
+document.addEventListener('keydown',function(e){if(e.key==='Enter'&&document.getElementById('modal-new').classList.contains('active'))confirmAddSite();});
 
 // ==================== 启动 ====================
-initSupabase();
-
-// 定时刷新（每分钟从云端拉取其他人更新的数据）
-setInterval(function() {
-  if (supabaseReady && !currentSiteId) loadFromCloud();
-}, 60000);
+updateSyncStatus(false,'连接中...');
+loadFromCloud();
+setInterval(function(){if(!currentSiteId)loadFromCloud();},60000);
 </script>
 </body>
 </html>
