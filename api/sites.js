@@ -1,37 +1,53 @@
-const { neon } = require('@neondatabase/serverless');
+const { Pool } = require('@neondatabase/serverless');
 
-let rawUrl = process.env.DATABASE_URL;
+const rawUrl = process.env.DATABASE_URL;
 
-// Sanitize: strip channel_binding param which the driver doesn't understand
-if (rawUrl) {
-  try {
-    const u = new URL(rawUrl);
+// Parse connection URL manually to bypass neon() URL format validation
+function parseDbUrl(url) {
+  if (!url) return null;
+  // Strip channel_binding param if present
+  let clean = url;
+  if (clean.includes('channel_binding')) {
+    const u = new URL(clean);
     u.searchParams.delete('channel_binding');
-    rawUrl = u.toString();
-  } catch (_) {
-    // If URL parsing fails, keep rawUrl as-is
+    clean = u.toString();
   }
+  const u = new URL(clean);
+  return {
+    host: u.hostname,
+    port: parseInt(u.port || '5432'),
+    database: u.pathname.slice(1),
+    user: decodeURIComponent(u.username),
+    password: decodeURIComponent(u.password),
+    ssl: { rejectUnauthorized: false },
+    max: 1,
+    idleTimeoutMillis: 5000,
+    connectionTimeoutMillis: 5000,
+  };
 }
 
-const DATABASE_URL = rawUrl;
+const dbConfig = parseDbUrl(rawUrl);
 
 let tableReady = false;
 
-async function ensureTable() {
+async function ensureTable(pool) {
   if (tableReady) return;
-  if (!DATABASE_URL) throw new Error('DATABASE_URL not configured');
-  const sql = neon(DATABASE_URL);
-  await sql(`
-    CREATE TABLE IF NOT EXISTS sites (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      data JSONB NOT NULL DEFAULT '{}'::jsonb,
-      created_at TIMESTAMPTZ DEFAULT NOW(),
-      updated_at TIMESTAMPTZ DEFAULT NOW()
-    )
-  `);
-  await sql(`CREATE INDEX IF NOT EXISTS idx_sites_updated_at ON sites (updated_at DESC)`);
-  tableReady = true;
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS sites (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        data JSONB NOT NULL DEFAULT '{}'::jsonb,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_sites_updated_at ON sites (updated_at DESC)`);
+    tableReady = true;
+  } finally {
+    client.release();
+  }
 }
 
 module.exports = async function handler(req, res) {
@@ -43,17 +59,18 @@ module.exports = async function handler(req, res) {
     return res.status(200).end();
   }
 
-  if (!DATABASE_URL) {
+  if (!dbConfig) {
     return res.status(500).json({ error: 'DATABASE_URL not configured' });
   }
 
+  let pool;
   try {
-    await ensureTable();
-    const sql = neon(DATABASE_URL);
+    pool = new Pool(dbConfig);
+    await ensureTable(pool);
 
     if (req.method === 'GET') {
-      const rows = await sql`SELECT * FROM sites ORDER BY updated_at DESC`;
-      const sites = rows.map(r => ({
+      const result = await pool.query('SELECT * FROM sites ORDER BY updated_at DESC');
+      const sites = result.rows.map(r => ({
         id: r.id,
         name: r.name,
         data: r.data,
@@ -68,14 +85,15 @@ module.exports = async function handler(req, res) {
       if (!id || !name) {
         return res.status(400).json({ error: 'id and name are required' });
       }
-      await sql`
-        INSERT INTO sites (id, name, data, updated_at)
-        VALUES (${id}, ${name}, ${JSON.stringify(data || {})}, NOW())
-        ON CONFLICT (id) DO UPDATE SET
-          name = EXCLUDED.name,
-          data = EXCLUDED.data,
-          updated_at = NOW()
-      `;
+      await pool.query(
+        `INSERT INTO sites (id, name, data, updated_at)
+         VALUES ($1, $2, $3, NOW())
+         ON CONFLICT (id) DO UPDATE SET
+           name = EXCLUDED.name,
+           data = EXCLUDED.data,
+           updated_at = NOW()`,
+        [id, name, JSON.stringify(data || {})]
+      );
       return res.status(200).json({ ok: true });
     }
 
@@ -84,7 +102,7 @@ module.exports = async function handler(req, res) {
       if (!id) {
         return res.status(400).json({ error: 'id is required' });
       }
-      await sql`DELETE FROM sites WHERE id = ${id}`;
+      await pool.query('DELETE FROM sites WHERE id = $1', [id]);
       return res.status(200).json({ ok: true });
     }
 
@@ -93,5 +111,9 @@ module.exports = async function handler(req, res) {
   } catch (err) {
     console.error('API error:', err);
     return res.status(500).json({ error: err.message });
+  } finally {
+    if (pool) {
+      try { await pool.end(); } catch (_) {}
+    }
   }
 };
